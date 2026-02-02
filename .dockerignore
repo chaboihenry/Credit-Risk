@@ -1,0 +1,4 @@
+# Ignore the data folder during build context
+Lending Club Default Data/
+*.csv
+.git
