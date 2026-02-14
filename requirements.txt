@@ -7,9 +7,11 @@
 # jupyter
 # ipykernel
 
-torch
-torchvision
-torchaudio
+# No neural network ml models were utilized
+# comment out to avoid massive uncessary docker image
+# torch
+# torchvision
+# torchaudio
 
 # Data Visualization
 matplotlib>=3.7.2

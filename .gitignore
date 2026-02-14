@@ -208,3 +208,6 @@ __marimo__/
 Data/
 .vscode/
 .DS_Store
+rmm_log.txt
+# OS/Notebook generated trash folders
+.Trash-0/
