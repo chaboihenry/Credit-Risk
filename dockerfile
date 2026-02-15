@@ -11,6 +11,9 @@ WORKDIR /app
 # copy requirements file
 COPY requirements.txt .
 
+# update package list and install git
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # install the auxiliary tools
 RUN pip install --no-cache-dir -r requirements.txt
 
