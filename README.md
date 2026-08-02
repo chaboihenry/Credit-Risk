@@ -1,36 +1,41 @@
-# Strategic Credit Risk & Automated Underwriting Pipeline
 
-This repository features a production-oriented machine learning system designed to handle massive financial datasets, filter loan applications at scale, and predict default probability.
+# Credit Risk Modeling & Model Validation (Lending Club)
 
-### 🚀 System Architecture
-The pipeline is divided into two distinct machine learning stages:
-1.  **The Gatekeeper Model:** An XGBoost classifier trained on ~28M records. It handles extreme class imbalance (98.8% rejection rate) to automate initial loan triage.
-2.  **The Default Probability Model:** A risk-assessment model specifically for accepted applicants, predicting the likelihood of "Charged Off" vs "Fully Paid" outcomes.
+This project does two things: it builds a machine learning model that predicts which loan borrowers will default, and it then **audits that entire pipeline the way a bank's model validation team would** — finding and fixing serious flaws, and rejecting one model outright.
 
-### 🛠️ Technical Highlights
-* **Big Data Engineering:** Utilized **NVIDIA RAPIDS (cuDF)** for GPU-accelerated processing, enabling the manipulation of a 3.6GB+ dataset that exceeds standard CPU memory efficiency.
-* **Imbalance Management:** Implemented strategic sampling and weight adjustments to handle the high sparsity of accepted loans (approx. 1.1% of the total dataset).
-* **Deployment Readiness:** All models are serialized in JSON format with independent feature-list tracking in the `Models/` directory to ensure environment-agnostic inference.
+The original version of this project reported impressive numbers. The validation work showed several of them were misleading. This README documents both the corrected results and the problems found, because in credit risk, knowing *why* a number can't be trusted matters as much as the number.
 
----
+### The Two Models
 
-### 📊 Model Performance & Financial Logic
+1. **Gatekeeper Model — REJECTED.** An XGBoost classifier meant to replicate Lending Club's accept/reject decision across ~29.9M applications. Validation found it unfit for use (details below). It is kept in the repo as a documented case study, not a working model.
+2. **Default Probability Model — CORRECTED & KEPT.** An XGBoost model predicting "Charged Off" vs "Fully Paid" on **1.35M completed loans** (2007–2018), rebuilt after validation and evaluated honestly.
 
-#### 1. The Gatekeeper (Approval Logic)
-The Gatekeeper was designed to filter "Spam" or unqualified applications. The model learned a "Bell Curve" for approvals based on Debt-to-Income (DTI) ratios.
+### What the Validation Found & Fixed (Default Model)
 
-![DTI Logic Visual](dti_logic_visual.png)
-*Insight: The model successfully identified that the highest density of approvals occurs at a 14.6% DTI, strictly rejecting applicants with DTIs above 40%.*
+| Issue               | Before                                                                                                                                             | After                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Test split          | Random & stratified — future loans leaked into training, and the test set was forced to match historical default rates                            | **Out-of-time split**: trained on 2007–2016, tested on 2017–2018                     |
+| Hidden risk drift   | Masked by stratification                                                                                                                           | Test-period default rate is 21.3% vs 19.7% in training — later loans genuinely default more |
+| Probability quality | Average predicted default chance:**69%** (actual: 21%) — caused by stacking two class-imbalance corrections                                 | Average predicted:**22.6%** vs actual 21.3%                                            |
+| Headline metric     | 0.7259 — cross-validation on an artificially balanced training set; test-set AUC was never computed                                               | **0.7181 AUC on true out-of-time test data**                                           |
+| Decision threshold  | 0.89 (an artifact of inflated probabilities)                                                                                                       | 0.51, chosen by profit simulation                                                            |
+| Profit claim        | "$198M" — gross profit, wrongly credited entirely to the model |**+$23.4M vs. approving everyone** ($137.7M vs a $114.3M no-model baseline) |                                                                                              |
 
-#### 2. Default Prediction (Risk Assessment)
-Once an application is "Accepted" by the Gatekeeper, it is passed to the Default Model. This model evaluates the risk of a loan going into default.
+### Why the Gatekeeper Was Rejected
 
-![Target Imbalance](class_imbalance.png)
-*Note: This stage focuses on high-precision risk assessment for the 268k loans that reached the final stage.*
+1. **It can never be checked.** It predicts whether Lending Club *approved* an application — but rejected applications have no outcome, so there is no way to know if any rejection was correct.
+2. **Its scores were measured on a fake population.** The test set was built 50/50 accepted/rejected; the real acceptance rate is ~7.6%.
+3. **The data contained an answer key.** A `policy_code` column perfectly separated the two classes (caught and removed before training).
+4. **A hidden leak was quantified.** Whether a credit score was even *recorded* predicts acceptance with 0.834 AUC by itself — 96% of the full model's power from one data-entry artifact. See `Gatekeeper_Rejected_Model_Case_Study.ipynb`.
 
----
+### Honest Limitations
 
-### 📁 Project Structure
-* `Gatekeeper_Model.ipynb`: Massive-scale data cleaning, GPU-accelerated merging, and initial classification.
-* `Default_Probability_Model.ipynb`: Secondary risk modeling, feature engineering for "Accepted" loan nuances, and model serialization.
-* `Models/`: Contains the production-ready `.json` model files and feature mappings.
+The default model is only valid for applicants resembling historically *approved* borrowers (the classic "reject inference" problem — rejected applicants have no repayment data). The profit simulation assumes full-term simple interest, a 10% recovery on defaults, and 2026 funding costs, with no prepayment modeling.
+
+### Project Structure
+
+* `Default_Probability_Model.ipynb` — data cleaning, feature engineering, out-of-time validation, calibrated model, profit optimization.
+* `Gatekeeper_Rejected_Model_Case_Study.ipynb` — full write-up of the rejected model, with evidence for each finding.
+* `Models/` — versioned artifacts: `default_risk_model_v1` (original, kept for comparison) and `default_risk_model_v2` (corrected).
+
+**Stack:** Python, pandas, XGBoost, scikit-learn, Docker (CPU-only, fully reproducible).
