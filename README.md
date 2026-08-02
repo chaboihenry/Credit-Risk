@@ -32,6 +32,15 @@ The original version of this project reported impressive numbers. The validation
 
 The default model is only valid for applicants resembling historically *approved* borrowers (the classic "reject inference" problem — rejected applicants have no repayment data). The profit simulation assumes full-term simple interest, a 10% recovery on defaults, and 2026 funding costs, with no prepayment modeling.
 
+![Profit vs approval threshold](Images/profit_optimization.png)
+*Net profit peaks at a 0.51 cut-off, but the curve is flat from 0.45–0.60 — the "optimal" threshold is a range, not a point. Approving everyone earns $114.3M; the model adds $23.4M.*
+
+![Predicted probability distribution](Images/probability_distribution.png)
+*Before correction, the model's average predicted default chance was 69% against a real rate of 21%. After removing the stacked imbalance corrections, predictions center on the true rate.*
+
+![DTI density, accepted vs rejected](Images/dti_logic_visual.png)
+*The rejected Gatekeeper model reproducing Lending Club's historical approval pattern — a policy, not a measure of borrower risk.*
+
 ### Project Structure
 
 * `Default_Probability_Model.ipynb` — data cleaning, feature engineering, out-of-time validation, calibrated model, profit optimization.
